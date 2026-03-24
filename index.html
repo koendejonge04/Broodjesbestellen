@@ -194,6 +194,42 @@
       margin-left: 4px;
     }
 
+    /* ── TIKKIE BOX ── */
+    .tikkie-box {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .tikkie-qr {
+      width: 180px;
+      height: 180px;
+      border-radius: 6px;
+    }
+    .tikkie-label {
+      font-size: .9rem;
+      color: var(--text-muted);
+    }
+    .tikkie-check-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .95rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .tikkie-check-label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: var(--red);
+    }
+
     /* ── PRICE BOX ── */
     .price-box {
       background: var(--white);
@@ -526,9 +562,25 @@
       </div>
     </div>
 
+    <!-- Tikkie betaling -->
+    <div class="step">
+      <div class="tikkie-box">
+        <img
+          src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https%3A%2F%2Ftikkie.me%2Fpay%2Fpm6h2nvdqrvpbef48esd"
+          alt="Tikkie QR-code"
+          class="tikkie-qr"
+        />
+        <p class="tikkie-label">Scan om te betalen via Tikkie</p>
+        <label class="tikkie-check-label">
+          <input type="checkbox" id="chk-betaald" />
+          <span>Ik heb betaald!</span>
+        </label>
+      </div>
+    </div>
+
     <!-- Stap 7: Bestel knop -->
     <div class="step" style="margin-bottom:0">
-      <button id="btn-submit">Bestelling plaatsen</button>
+      <button id="btn-submit" disabled>Bestelling plaatsen</button>
     </div>
 
     <!-- Bevestiging -->
@@ -737,6 +789,11 @@
   }
 
   // ════════════════════════════════════════════
+  // Checkbox "Ik heb betaald!" — ontgrendel bestelknop
+  document.getElementById("chk-betaald").addEventListener("change", function () {
+    document.getElementById("btn-submit").disabled = !this.checked;
+  });
+
   // SUBMIT ORDER
   // ════════════════════════════════════════════
   document.getElementById("btn-submit").addEventListener("click", async () => {
@@ -794,7 +851,8 @@
     updatePrice();
     document.getElementById("confirmation").style.display = "none";
     document.getElementById("btn-submit").style.display   = "";
-    document.getElementById("btn-submit").disabled = false;
+    document.getElementById("chk-betaald").checked = false;
+    document.getElementById("btn-submit").disabled = true;
     document.getElementById("btn-submit").textContent = "Bestelling plaatsen";
   });
 
