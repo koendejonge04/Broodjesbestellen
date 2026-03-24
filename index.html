@@ -573,9 +573,7 @@
     <div class="step">
       <div class="step-label">Stap 6</div>
       <h2>Prijsoverzicht</h2>
-      <div class="price-box">
-        <div class="price-row"><span>Broodje</span><span id="price-base">€6,00</span></div>
-        <div class="price-row"><span>Broodsoort meerprijs</span><span id="price-extra">€0,00</span></div>
+      <div class="price-box" style="display:none">
         <div class="price-row total"><span>Totaal</span><span id="price-total">€6,00</span></div>
       </div>
     </div>
@@ -674,7 +672,6 @@
   // ════════════════════════════════════════════
   // MENU DATA
   // ════════════════════════════════════════════
-  const BASE_PRICE = 6.00;
   const ADMIN_PASSWORD = "kamplacon2024";
 
   const KOUDE_BROODJES = [
@@ -700,10 +697,10 @@
   ];
 
   const BROODSOORTEN = [
-    { naam: "Demi baguette", meerprijs: 0.00 },
-    { naam: "Bruine bol",    meerprijs: 1.00 },
-    { naam: "Italiaanse bol",meerprijs: 1.00 },
-    { naam: "XL",            meerprijs: 2.00 }
+    { naam: "Demi baguette", prijs: 6.00 },
+    { naam: "Bruine bol",    prijs: 7.00 },
+    { naam: "Italiaanse bol",prijs: 7.00 },
+    { naam: "XL",            prijs: 8.00 }
   ];
 
   // ════════════════════════════════════════════
@@ -783,10 +780,7 @@
       const btn = document.createElement("button");
       btn.className = "bread-btn" + (i === 0 ? " selected" : "");
       btn.dataset.index = i;
-      const extraLabel = b.meerprijs === 0
-        ? '<span class="extra">(gratis)</span>'
-        : `<span class="extra">(+${fmt(b.meerprijs)})</span>`;
-      btn.innerHTML = `${b.naam} ${extraLabel}`;
+      btn.innerHTML = `${b.naam} <span class="extra">(${fmt(b.prijs)})</span>`;
       btn.addEventListener("click", () => {
         document.querySelectorAll(".bread-btn").forEach(b => b.classList.remove("selected"));
         btn.classList.add("selected");
@@ -801,11 +795,13 @@
   // PRICE UPDATE
   // ════════════════════════════════════════════
   function updatePrice() {
-    const extra = selectedBreadType ? selectedBreadType.meerprijs : 0;
-    const total = BASE_PRICE + extra;
-    document.getElementById("price-base").textContent  = fmt(BASE_PRICE);
-    document.getElementById("price-extra").textContent = fmt(extra);
-    document.getElementById("price-total").textContent = fmt(total);
+    const priceBox = document.querySelector(".price-box");
+    if (!selectedBreadType || !selectedSandwich) {
+      priceBox.style.display = "none";
+      return;
+    }
+    priceBox.style.display = "";
+    document.getElementById("price-total").textContent = fmt(selectedBreadType.prijs);
   }
 
   // ════════════════════════════════════════════
@@ -825,7 +821,7 @@
     const broodsoort = selectedBreadType.naam;
     const saus       = document.getElementById("select-saus").value;
     const opmerking  = document.getElementById("input-opmerkingen").value.trim();
-    const prijs      = BASE_PRICE + selectedBreadType.meerprijs;
+    const prijs      = selectedBreadType.prijs;
 
     const btn = document.getElementById("btn-submit");
     btn.disabled = true;
