@@ -215,6 +215,12 @@
       font-size: .9rem;
       color: var(--text-muted);
     }
+    .tikkie-link {
+      font-size: .85rem;
+      color: var(--red);
+      text-decoration: none;
+    }
+    .tikkie-link:hover { text-decoration: underline; }
     .tikkie-check-label {
       display: flex;
       align-items: center;
@@ -583,6 +589,7 @@
           class="tikkie-qr"
         />
         <p class="tikkie-label">Scan om te betalen via Tikkie</p>
+        <a href="https://tikkie.me/pay/pm6h2nvdqrvpbef48esd" target="_blank" rel="noopener" class="tikkie-link">📱 Betaallink voor telefoongebruikers</a>
         <label class="tikkie-check-label">
           <input type="checkbox" id="chk-betaald" />
           <span>Ik heb betaald!</span>
