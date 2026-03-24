@@ -506,6 +506,41 @@
       header { padding: 0 16px; }
       .container { padding: 20px 12px 50px; }
     }
+
+    /* ── GESLOTEN BANNER ── */
+    .closed-banner {
+      background: #fff3cd;
+      border: 1.5px solid #f0c040;
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .closed-banner .closed-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #7a5800;
+      margin-bottom: 6px;
+    }
+    .closed-banner .closed-msg {
+      font-size: .9rem;
+      color: #7a5800;
+      line-height: 1.5;
+    }
+
+    /* ── ADMIN TOGGLE KNOP ── */
+    .btn-toggle-list {
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: .85rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background .2s;
+    }
+    .btn-toggle-list.open   { background: #e8f5e9; color: #2e7d32; }
+    .btn-toggle-list.closed { background: #fdecea; color: var(--red); }
   </style>
 </head>
 <body>
@@ -519,6 +554,12 @@
 <!-- ══════════════ PAGE 1 — BESTELFORMULIER ══════════════ -->
 <div id="page-order" class="page active">
   <div class="container">
+
+    <!-- Bestellijst gesloten banner -->
+    <div id="closed-banner" class="closed-banner" style="display:none">
+      <div class="closed-title">🔒 De bestellijst is gesloten</div>
+      <div class="closed-msg">Je bent te laat, dus je zal het zelf moeten halen... geintje, bel me maar dan bestel ik hem nog voor je.</div>
+    </div>
 
     <!-- Stap 1: Naam -->
     <div class="step">
@@ -620,6 +661,7 @@
         <div class="week-info" id="week-info"></div>
       </div>
       <div class="admin-actions">
+        <button class="btn-toggle-list closed" id="btn-toggle-list">🔒 Bestellijst sluiten</button>
         <button class="btn-excel" id="btn-excel">⬇ Download Excel</button>
         <button class="btn-back" id="btn-back">← Terug</button>
       </div>
@@ -668,6 +710,44 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
+
+  // ════════════════════════════════════════════
+  // BESTELLIJST STATUS (real-time)
+  // ════════════════════════════════════════════
+  const statusRef = db.collection("instellingen").doc("status");
+
+  statusRef.onSnapshot(snap => {
+    const gesloten = snap.exists && snap.data().bestellijstGesloten === true;
+    applyListStatus(gesloten);
+  });
+
+  function applyListStatus(gesloten) {
+    document.getElementById("closed-banner").style.display = gesloten ? "" : "none";
+
+    // Blokkeer/deblokkeer alle invoervelden en knoppen op het bestelformulier
+    const form = document.getElementById("page-order");
+    form.querySelectorAll("input, select, textarea, button").forEach(el => {
+      if (el.id === "btn-new-order") return; // laat "nieuwe bestelling" altijd werken
+      el.disabled = gesloten;
+    });
+    // Kaarten
+    form.querySelectorAll(".sandwich-card, .bread-btn").forEach(el => {
+      el.style.pointerEvents = gesloten ? "none" : "";
+      el.style.opacity       = gesloten ? "0.45" : "";
+    });
+
+    // Admin-knop label bijwerken (als hij bestaat en ingeladen is)
+    const toggleBtn = document.getElementById("btn-toggle-list");
+    if (toggleBtn) {
+      if (gesloten) {
+        toggleBtn.textContent = "🔓 Bestellijst openen";
+        toggleBtn.classList.replace("closed", "open");
+      } else {
+        toggleBtn.textContent = "🔒 Bestellijst sluiten";
+        toggleBtn.classList.replace("open", "closed");
+      }
+    }
+  }
 
   // ════════════════════════════════════════════
   // MENU DATA
@@ -911,6 +991,12 @@
   // ADMIN PAGE
   // ════════════════════════════════════════════
   document.getElementById("btn-back").addEventListener("click", () => showPage("page-order"));
+
+  document.getElementById("btn-toggle-list").addEventListener("click", async () => {
+    const snap = await statusRef.get();
+    const huidig = snap.exists && snap.data().bestellijstGesloten === true;
+    await statusRef.set({ bestellijstGesloten: !huidig }, { merge: true });
+  });
 
   async function openAdminPage() {
     showPage("page-admin");
