@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KAMPLACON | Broodjes bestellen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Firebase v9 compat -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <!-- SheetJS -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:   #CC0000;
+      --red-dark: #A30000;
+      --dark:  #2D2D2D;
+      --bg:    #F5F5F5;
+      --white: #FFFFFF;
+      --border: #E0E0E0;
+      --text-muted: #666;
+      --radius: 10px;
+      --shadow: 0 2px 8px rgba(0,0,0,.10);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--dark);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--dark);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    }
+    .header-logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    .header-logo span { color: var(--red); }
+    #btn-beheer {
+      background: transparent;
+      border: 1.5px solid rgba(255,255,255,.4);
+      color: var(--white);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .85rem;
+      font-family: inherit;
+      transition: background .2s, border-color .2s;
+    }
+    #btn-beheer:hover { background: rgba(255,255,255,.1); border-color: var(--white); }
+
+    /* ── PAGES ── */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ── CONTAINER ── */
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 28px 16px 60px;
+    }
+
+    /* ── STEPS ── */
+    .step { margin-bottom: 28px; }
+    .step-label {
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--red);
+      margin-bottom: 8px;
+    }
+    .step h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--dark);
+    }
+
+    /* ── INPUTS ── */
+    input[type="text"], textarea, select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-family: inherit;
+      background: var(--white);
+      color: var(--dark);
+      transition: border-color .2s;
+      outline: none;
+    }
+    input[type="text"]:focus, textarea:focus, select:focus {
+      border-color: var(--red);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* ── SANDWICH CARDS ── */
+    .group-label {
+      font-size: .8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-muted);
+      margin: 14px 0 8px;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 10px;
+    }
+    .sandwich-card {
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 10px;
+      cursor: pointer;
+      text-align: center;
+      font-size: .875rem;
+      font-weight: 500;
+      transition: border-color .15s, background .15s, transform .1s;
+      user-select: none;
+      line-height: 1.3;
+    }
+    .sandwich-card:hover { border-color: var(--red); background: #fff5f5; }
+    .sandwich-card.selected {
+      border-color: var(--red);
+      background: var(--red);
+      color: var(--white);
+    }
+    .sandwich-card .type-badge {
+      display: inline-block;
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      padding: 1px 6px;
+      border-radius: 20px;
+      margin-bottom: 4px;
+    }
+    .sandwich-card .type-badge.warm  { background: #FFE0CC; color: #B34700; }
+    .sandwich-card .type-badge.koud  { background: #D0EAF9; color: #1A5276; }
+    .sandwich-card.selected .type-badge.warm { background: rgba(255,255,255,.25); color: var(--white); }
+    .sandwich-card.selected .type-badge.koud { background: rgba(255,255,255,.25); color: var(--white); }
+
+    /* ── BREAD BUTTONS ── */
+    .bread-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .bread-btn {
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      cursor: pointer;
+      font-size: .875rem;
+      font-family: inherit;
+      font-weight: 500;
+      color: var(--dark);
+      transition: border-color .15s, background .15s;
+      user-select: none;
+    }
+    .bread-btn:hover { border-color: var(--red); background: #fff5f5; }
+    .bread-btn.selected {
+      border-color: var(--red);
+      background: var(--red);
+      color: var(--white);
+    }
+    .bread-btn .extra {
+      font-size: .75rem;
+      opacity: .75;
+      margin-left: 4px;
+    }
+
+    /* ── PRICE BOX ── */
+    .price-box {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      box-shadow: var(--shadow);
+    }
+    .price-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: .9rem;
+      padding: 4px 0;
+      color: var(--text-muted);
+    }
+    .price-row.total {
+      border-top: 1.5px solid var(--border);
+      margin-top: 8px;
+      padding-top: 10px;
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--dark);
+    }
+
+    /* ── SUBMIT BUTTON ── */
+    #btn-submit {
+      width: 100%;
+      background: var(--red);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+      letter-spacing: .02em;
+    }
+    #btn-submit:hover  { background: var(--red-dark); }
+    #btn-submit:active { transform: scale(.98); }
+    #btn-submit:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+
+    /* ── CONFIRMATION ── */
+    #confirmation {
+      display: none;
+      background: var(--white);
+      border: 2px solid #28a745;
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    #confirmation .check { font-size: 2.5rem; }
+    #confirmation h3 { font-size: 1.2rem; margin: 10px 0 6px; color: #1a7a30; }
+    #confirmation p  { color: var(--text-muted); font-size: .95rem; }
+    #btn-new-order {
+      margin-top: 16px;
+      background: var(--red);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius);
+      padding: 12px 24px;
+      font-size: .95rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    #btn-new-order:hover { background: var(--red-dark); }
+
+    /* ── ADMIN / PASSWORD MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    }
+    .modal h2 { font-size: 1.1rem; margin-bottom: 16px; }
+    .modal input[type="password"] {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-family: inherit;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .modal input[type="password"]:focus { border-color: var(--red); }
+    .modal-error { color: var(--red); font-size: .85rem; margin-bottom: 10px; min-height: 1.2em; }
+    .modal-actions { display: flex; gap: 10px; }
+    .btn-primary {
+      flex: 1;
+      background: var(--red);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius);
+      padding: 11px;
+      font-size: .95rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-primary:hover { background: var(--red-dark); }
+    .btn-secondary {
+      flex: 1;
+      background: transparent;
+      color: var(--dark);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 11px;
+      font-size: .95rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-secondary:hover { background: var(--bg); }
+
+    /* ── ADMIN PAGE ── */
+    .admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .admin-header h1 { font-size: 1.25rem; }
+    .admin-header .week-info { font-size: .85rem; color: var(--text-muted); margin-top: 2px; }
+    .admin-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .btn-excel {
+      background: #1D6F42;
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 18px;
+      font-size: .875rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-excel:hover { background: #155232; }
+    .btn-back {
+      background: transparent;
+      color: var(--dark);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 18px;
+      font-size: .875rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-back:hover { background: var(--border); }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--white);
+      font-size: .875rem;
+    }
+    thead tr { background: var(--dark); color: var(--white); }
+    thead th {
+      padding: 12px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(even) { background: #FAFAFA; }
+    tbody tr:hover { background: #FFF3F3; }
+    tbody td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .total-bar {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow);
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .total-bar .amount { color: var(--red); font-size: 1.15rem; }
+
+    .empty-state {
+      text-align: center;
+      padding: 50px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+      font-size: .95rem;
+    }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--dark);
+      color: var(--white);
+      padding: 12px 22px;
+      border-radius: 30px;
+      font-size: .9rem;
+      font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,.25);
+      transition: transform .3s ease;
+      z-index: 300;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.error { background: var(--red); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 480px) {
+      .card-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+      .bread-options { gap: 8px; }
+      .bread-btn { padding: 9px 12px; font-size: .825rem; }
+      header { padding: 0 16px; }
+      .container { padding: 20px 12px 50px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header>
+  <div class="header-logo"><span>KAMPLACON</span> | Broodjes bestellen</div>
+  <button id="btn-beheer">Beheer</button>
+</header>
+
+<!-- ══════════════ PAGE 1 — BESTELFORMULIER ══════════════ -->
+<div id="page-order" class="page active">
+  <div class="container">
+
+    <!-- Stap 1: Naam -->
+    <div class="step">
+      <div class="step-label">Stap 1</div>
+      <h2>Wat is je naam?</h2>
+      <input type="text" id="input-naam" placeholder="Jouw naam…" autocomplete="off" />
+    </div>
+
+    <!-- Stap 2: Broodje -->
+    <div class="step">
+      <div class="step-label">Stap 2</div>
+      <h2>Kies een broodje</h2>
+
+      <div class="group-label">Koude broodjes</div>
+      <div class="card-grid" id="grid-koud"></div>
+
+      <div class="group-label" style="margin-top:18px">Warme broodjes</div>
+      <div class="card-grid" id="grid-warm"></div>
+    </div>
+
+    <!-- Stap 3: Broodsoort -->
+    <div class="step">
+      <div class="step-label">Stap 3</div>
+      <h2>Kies een broodsoort</h2>
+      <div class="bread-options" id="bread-options"></div>
+    </div>
+
+    <!-- Stap 4: Saus -->
+    <div class="step">
+      <div class="step-label">Stap 4</div>
+      <h2>Kies een saus</h2>
+      <select id="select-saus">
+        <option value="Geen saus">Geen saus</option>
+        <option value="Satesaus">Satesaus</option>
+        <option value="Joppiesaus">Joppiesaus</option>
+        <option value="Honingmosterd">Honingmosterd</option>
+        <option value="Mosterd">Mosterd</option>
+        <option value="Jamballa">Jamballa</option>
+        <option value="Keursaus">Keursaus</option>
+        <option value="Vershuyssaus">Vershuyssaus</option>
+      </select>
+    </div>
+
+    <!-- Stap 5: Opmerkingen -->
+    <div class="step">
+      <div class="step-label">Stap 5</div>
+      <h2>Opmerkingen <span style="color:var(--text-muted);font-weight:400">(optioneel)</span></h2>
+      <textarea id="input-opmerkingen" placeholder="Bijv. geen ui, extra saus…"></textarea>
+    </div>
+
+    <!-- Stap 6: Prijsoverzicht -->
+    <div class="step">
+      <div class="step-label">Stap 6</div>
+      <h2>Prijsoverzicht</h2>
+      <div class="price-box">
+        <div class="price-row"><span>Broodje</span><span id="price-base">€6,00</span></div>
+        <div class="price-row"><span>Broodsoort meerprijs</span><span id="price-extra">€0,00</span></div>
+        <div class="price-row total"><span>Totaal</span><span id="price-total">€6,00</span></div>
+      </div>
+    </div>
+
+    <!-- Stap 7: Bestel knop -->
+    <div class="step" style="margin-bottom:0">
+      <button id="btn-submit">Bestelling plaatsen</button>
+    </div>
+
+    <!-- Bevestiging -->
+    <div id="confirmation" style="margin-top:24px">
+      <div class="check">✅</div>
+      <h3 id="conf-title">Bestelling geplaatst!</h3>
+      <p id="conf-desc"></p>
+      <button id="btn-new-order">Nieuwe bestelling</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ PAGE 2 — BEHEER ══════════════ -->
+<div id="page-admin" class="page">
+  <div class="container">
+    <div class="admin-header">
+      <div>
+        <h1>Weekoverzicht bestellingen</h1>
+        <div class="week-info" id="week-info"></div>
+      </div>
+      <div class="admin-actions">
+        <button class="btn-excel" id="btn-excel">⬇ Download Excel</button>
+        <button class="btn-back" id="btn-back">← Terug</button>
+      </div>
+    </div>
+
+    <div id="admin-content">
+      <div class="loading">Bestellingen laden…</div>
+    </div>
+
+    <div class="total-bar" id="total-bar" style="display:none">
+      <span>Totaal deze week</span>
+      <span class="amount" id="admin-total">€0,00</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ WACHTWOORD MODAL ══════════════ -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2>Beheer inloggen</h2>
+    <input type="password" id="input-password" placeholder="Wachtwoord…" />
+    <div class="modal-error" id="modal-error"></div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="btn-login">Inloggen</button>
+      <button class="btn-secondary" id="btn-cancel">Annuleren</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ TOAST ══════════════ -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ════════════════════════════════════════════
+  // FIREBASE CONFIG — vervang met jouw eigen config
+  // ════════════════════════════════════════════
+  const firebaseConfig = {
+    apiKey:            "JOUW_API_KEY",
+    authDomain:        "JOUW_PROJECT.firebaseapp.com",
+    projectId:         "JOUW_PROJECT_ID",
+    storageBucket:     "JOUW_PROJECT.appspot.com",
+    messagingSenderId: "JOUW_SENDER_ID",
+    appId:             "JOUW_APP_ID"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // ════════════════════════════════════════════
+  // MENU DATA
+  // ════════════════════════════════════════════
+  const BASE_PRICE = 6.00;
+  const ADMIN_PASSWORD = "kamplacon2024";
+
+  const KOUDE_BROODJES = [
+    "Broodje carpaccio",
+    "Broodje filet americain",
+    "Broodje gezond",
+    "Broodje kip carpaccio",
+    "Broodje Lange Nering",
+    "Broodje Marloes"
+  ];
+
+  const WARME_BROODJES = [
+    "Broodje bal gehakt",
+    "Broodje Brie",
+    "Broodje grillworst",
+    "Broodje Hessel",
+    "Broodje Jalapeño Hotdog",
+    "Broodje jamballa",
+    "Broodje kippeling",
+    "Broodje Rookworst",
+    "Broodje warme beenham"
+  ];
+
+  const BROODSOORTEN = [
+    { naam: "Demi baguette", meerprijs: 0.00 },
+    { naam: "Bruine bol",    meerprijs: 1.00 },
+    { naam: "Italiaanse bol",meerprijs: 1.00 },
+    { naam: "XL",            meerprijs: 2.00 }
+  ];
+
+  // ════════════════════════════════════════════
+  // STATE
+  // ════════════════════════════════════════════
+  let selectedSandwich  = null;
+  let selectedBreadType = BROODSOORTEN[0];
+
+  // ════════════════════════════════════════════
+  // HELPERS
+  // ════════════════════════════════════════════
+  function fmt(amount) {
+    return "€" + amount.toFixed(2).replace(".", ",");
+  }
+
+  function showToast(msg, isError = false) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.toggle("error", isError);
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 3000);
+  }
+
+  function showPage(id) {
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+    window.scrollTo(0, 0);
+  }
+
+  function getWeekNumber(d) {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  }
+
+  function getWeekBounds(now) {
+    const day = now.getDay(); // 0=Sun
+    const diffToMon = (day === 0) ? -6 : 1 - day;
+    const mon = new Date(now);
+    mon.setDate(now.getDate() + diffToMon);
+    mon.setHours(0, 0, 0, 0);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    sun.setHours(23, 59, 59, 999);
+    return { mon, sun };
+  }
+
+  // ════════════════════════════════════════════
+  // BUILD SANDWICH CARDS
+  // ════════════════════════════════════════════
+  function buildCards(items, type, containerId) {
+    const grid = document.getElementById(containerId);
+    items.forEach(name => {
+      const card = document.createElement("div");
+      card.className = "sandwich-card";
+      card.dataset.name = name;
+      card.innerHTML = `<div class="type-badge ${type}">${type === "warm" ? "Warm" : "Koud"}</div><br>${name}`;
+      card.addEventListener("click", () => selectSandwich(name, card));
+      grid.appendChild(card);
+    });
+  }
+
+  function selectSandwich(name, el) {
+    document.querySelectorAll(".sandwich-card").forEach(c => c.classList.remove("selected"));
+    el.classList.add("selected");
+    selectedSandwich = name;
+    updatePrice();
+  }
+
+  // ════════════════════════════════════════════
+  // BUILD BREAD BUTTONS
+  // ════════════════════════════════════════════
+  function buildBreadOptions() {
+    const wrap = document.getElementById("bread-options");
+    BROODSOORTEN.forEach((b, i) => {
+      const btn = document.createElement("button");
+      btn.className = "bread-btn" + (i === 0 ? " selected" : "");
+      btn.dataset.index = i;
+      const extraLabel = b.meerprijs === 0
+        ? '<span class="extra">(gratis)</span>'
+        : `<span class="extra">(+${fmt(b.meerprijs)})</span>`;
+      btn.innerHTML = `${b.naam} ${extraLabel}`;
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".bread-btn").forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        selectedBreadType = BROODSOORTEN[i];
+        updatePrice();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  // ════════════════════════════════════════════
+  // PRICE UPDATE
+  // ════════════════════════════════════════════
+  function updatePrice() {
+    const extra = selectedBreadType ? selectedBreadType.meerprijs : 0;
+    const total = BASE_PRICE + extra;
+    document.getElementById("price-base").textContent  = fmt(BASE_PRICE);
+    document.getElementById("price-extra").textContent = fmt(extra);
+    document.getElementById("price-total").textContent = fmt(total);
+  }
+
+  // ════════════════════════════════════════════
+  // SUBMIT ORDER
+  // ════════════════════════════════════════════
+  document.getElementById("btn-submit").addEventListener("click", async () => {
+    const naam = document.getElementById("input-naam").value.trim();
+    if (!naam) { showToast("Vul je naam in.", true); return; }
+    if (!selectedSandwich) { showToast("Kies een broodje.", true); return; }
+
+    const broodje    = selectedSandwich;
+    const broodsoort = selectedBreadType.naam;
+    const saus       = document.getElementById("select-saus").value;
+    const opmerking  = document.getElementById("input-opmerkingen").value.trim();
+    const prijs      = BASE_PRICE + selectedBreadType.meerprijs;
+
+    const btn = document.getElementById("btn-submit");
+    btn.disabled = true;
+    btn.textContent = "Wordt geplaatst…";
+
+    try {
+      await db.collection("bestellingen").add({
+        naam,
+        broodje,
+        broodsoort,
+        saus,
+        opmerkingen: opmerking,
+        prijs,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Bevestiging tonen
+      document.getElementById("conf-title").textContent = `Bestelling geplaatst, ${naam}!`;
+      document.getElementById("conf-desc").textContent  =
+        `${broodje} op ${broodsoort.toLowerCase()} met ${saus.toLowerCase()} — ${fmt(prijs)}`;
+      document.getElementById("confirmation").style.display = "block";
+      document.getElementById("btn-submit").style.display   = "none";
+
+    } catch (e) {
+      console.error(e);
+      showToast("Er ging iets mis. Probeer opnieuw.", true);
+      btn.disabled = false;
+      btn.textContent = "Bestelling plaatsen";
+    }
+  });
+
+  // Nieuwe bestelling
+  document.getElementById("btn-new-order").addEventListener("click", () => {
+    document.getElementById("input-naam").value = "";
+    document.getElementById("input-opmerkingen").value = "";
+    document.getElementById("select-saus").value = "Geen saus";
+    document.querySelectorAll(".sandwich-card").forEach(c => c.classList.remove("selected"));
+    document.querySelectorAll(".bread-btn").forEach((b, i) => {
+      b.classList.toggle("selected", i === 0);
+    });
+    selectedSandwich  = null;
+    selectedBreadType = BROODSOORTEN[0];
+    updatePrice();
+    document.getElementById("confirmation").style.display = "none";
+    document.getElementById("btn-submit").style.display   = "";
+    document.getElementById("btn-submit").disabled = false;
+    document.getElementById("btn-submit").textContent = "Bestelling plaatsen";
+  });
+
+  // ════════════════════════════════════════════
+  // BEHEER — PASSWORD MODAL
+  // ════════════════════════════════════════════
+  document.getElementById("btn-beheer").addEventListener("click", () => {
+    document.getElementById("modal-overlay").classList.add("open");
+    document.getElementById("input-password").value = "";
+    document.getElementById("modal-error").textContent = "";
+    setTimeout(() => document.getElementById("input-password").focus(), 50);
+  });
+
+  document.getElementById("btn-cancel").addEventListener("click", () => {
+    document.getElementById("modal-overlay").classList.remove("open");
+  });
+
+  document.getElementById("modal-overlay").addEventListener("click", (e) => {
+    if (e.target === document.getElementById("modal-overlay"))
+      document.getElementById("modal-overlay").classList.remove("open");
+  });
+
+  document.getElementById("input-password").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btn-login").click();
+  });
+
+  document.getElementById("btn-login").addEventListener("click", () => {
+    const pw = document.getElementById("input-password").value;
+    if (pw === ADMIN_PASSWORD) {
+      document.getElementById("modal-overlay").classList.remove("open");
+      openAdminPage();
+    } else {
+      document.getElementById("modal-error").textContent = "Onjuist wachtwoord.";
+      document.getElementById("input-password").value = "";
+      document.getElementById("input-password").focus();
+    }
+  });
+
+  // ════════════════════════════════════════════
+  // ADMIN PAGE
+  // ════════════════════════════════════════════
+  document.getElementById("btn-back").addEventListener("click", () => showPage("page-order"));
+
+  async function openAdminPage() {
+    showPage("page-admin");
+
+    const now    = new Date();
+    const weekNr = getWeekNumber(now);
+    const jaar   = now.getFullYear();
+    const { mon, sun } = getWeekBounds(now);
+
+    const dateFmt = (d) => d.toLocaleDateString("nl-NL", { day: "2-digit", month: "long" });
+    document.getElementById("week-info").textContent =
+      `Week ${weekNr} — ${dateFmt(mon)} t/m ${dateFmt(sun)} ${jaar}`;
+
+    const content  = document.getElementById("admin-content");
+    const totalBar = document.getElementById("total-bar");
+    content.innerHTML  = '<div class="loading">Bestellingen laden…</div>';
+    totalBar.style.display = "none";
+
+    try {
+      const snapshot = await db.collection("bestellingen")
+        .where("timestamp", ">=", mon)
+        .where("timestamp", "<=", sun)
+        .orderBy("timestamp", "asc")
+        .get();
+
+      if (snapshot.empty) {
+        content.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">🥖</div>
+            <p>Geen bestellingen deze week.</p>
+          </div>`;
+        return;
+      }
+
+      const rows = [];
+      snapshot.forEach(doc => rows.push({ id: doc.id, ...doc.data() }));
+
+      const totalPrijs = rows.reduce((s, r) => s + (r.prijs || 0), 0);
+
+      const trs = rows.map(r => {
+        const ts = r.timestamp?.toDate
+          ? r.timestamp.toDate().toLocaleString("nl-NL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+          : "—";
+        return `<tr>
+          <td><strong>${escHtml(r.naam || "")}</strong><br><small style="color:var(--text-muted)">${ts}</small></td>
+          <td>${escHtml(r.broodje || "")}</td>
+          <td>${escHtml(r.broodsoort || "")}</td>
+          <td>${escHtml(r.saus || "")}</td>
+          <td>${escHtml(r.opmerkingen || "—")}</td>
+          <td style="white-space:nowrap;font-weight:600">${fmt(r.prijs || 0)}</td>
+        </tr>`;
+      }).join("");
+
+      content.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Naam</th>
+                <th>Broodje</th>
+                <th>Broodsoort</th>
+                <th>Saus</th>
+                <th>Opmerkingen</th>
+                <th>Prijs</th>
+              </tr>
+            </thead>
+            <tbody>${trs}</tbody>
+          </table>
+        </div>`;
+
+      document.getElementById("admin-total").textContent = fmt(totalPrijs);
+      totalBar.style.display = "flex";
+
+      // Excel export
+      document.getElementById("btn-excel").onclick = () => exportExcel(rows, weekNr, jaar);
+
+    } catch (e) {
+      console.error(e);
+      content.innerHTML = `<div class="empty-state"><p style="color:var(--red)">Fout bij laden. Controleer de Firebase config.</p></div>`;
+    }
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // ════════════════════════════════════════════
+  // EXCEL EXPORT
+  // ════════════════════════════════════════════
+  function exportExcel(rows, weekNr, jaar) {
+    const data = [
+      ["Naam", "Broodje", "Broodsoort", "Saus", "Opmerkingen", "Prijs (€)", "Tijdstip"],
+      ...rows.map(r => [
+        r.naam || "",
+        r.broodje || "",
+        r.broodsoort || "",
+        r.saus || "",
+        r.opmerkingen || "",
+        r.prijs || 0,
+        r.timestamp?.toDate
+          ? r.timestamp.toDate().toLocaleString("nl-NL")
+          : ""
+      ])
+    ];
+
+    const totaalRij = ["", "", "", "", "TOTAAL", rows.reduce((s, r) => s + (r.prijs || 0), 0), ""];
+    data.push(totaalRij);
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Kolombreedte
+    ws["!cols"] = [
+      { wch: 20 }, { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 30 }, { wch: 12 }, { wch: 18 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `Week ${weekNr}`);
+    XLSX.writeFile(wb, `Broodjes_week_${weekNr}_${jaar}.xlsx`);
+  }
+
+  // ════════════════════════════════════════════
+  // INIT
+  // ════════════════════════════════════════════
+  buildCards(KOUDE_BROODJES, "koud", "grid-koud");
+  buildCards(WARME_BROODJES, "warm", "grid-warm");
+  buildBreadOptions();
+  updatePrice();
+</script>
+</body>
+</html>
