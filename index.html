@@ -728,8 +728,18 @@
     const form = document.getElementById("page-order");
     form.querySelectorAll("input, select, textarea, button").forEach(el => {
       if (el.id === "btn-new-order") return; // laat "nieuwe bestelling" altijd werken
+      if (el.id === "btn-submit") return; // wordt beheerd door de betaald-checkbox
       el.disabled = gesloten;
     });
+    // Bestelknop: alleen inschakelen als lijst open én betaald-checkbox aangevinkt
+    const btnSubmit = document.getElementById("btn-submit");
+    const chkBetaald = document.getElementById("chk-betaald");
+    if (gesloten) {
+      btnSubmit.disabled = true;
+    } else {
+      btnSubmit.disabled = !chkBetaald.checked;
+    }
+
     // Kaarten
     form.querySelectorAll(".sandwich-card, .bread-btn").forEach(el => {
       el.style.pointerEvents = gesloten ? "none" : "";
