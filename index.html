@@ -14,6 +14,9 @@
   <!-- SheetJS -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -170,6 +173,42 @@
       background: var(--red);
       color: var(--white);
       box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    }
+
+    /* ── POPULAR BADGE ── */
+    .popular-badge {
+      display: inline-block;
+      background: #FFD700;
+      color: #7a5800;
+      font-size: .65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      margin-left: 6px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .sandwich-card.selected .popular-badge {
+      background: rgba(255,255,255,.3);
+      color: var(--white);
+    }
+
+    /* ── CHART ── */
+    .chart-section {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .chart-section h3 {
+      font-size: .95rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--dark);
+    }
+    .chart-section canvas {
+      max-height: 320px;
     }
 
     /* ── BREAD BUTTONS ── */
@@ -690,6 +729,11 @@
       </div>
     </div>
 
+    <div class="chart-section" id="chart-section" style="display:none">
+      <h3>Populariteit per week</h3>
+      <canvas id="chart-populair"></canvas>
+    </div>
+
     <div id="admin-content">
       <div class="loading">Bestellingen laden…</div>
     </div>
@@ -1124,10 +1168,115 @@
       // Excel export
       document.getElementById("btn-excel").onclick = () => exportExcel(rows, weekNr, jaar);
 
+      // Chart — fetch all orders across all weeks
+      const allSnap = await db.collection("bestellingen").get();
+      const allRows = [];
+      allSnap.forEach(doc => allRows.push(doc.data()));
+      renderChart(allRows);
+
     } catch (e) {
       console.error(e);
       content.innerHTML = `<div class="empty-state"><p style="color:var(--red)">Fout bij laden. Controleer de Firebase config.</p></div>`;
     }
+  }
+
+  // ════════════════════════════════════════════
+  // CHART — populariteit per week
+  // ════════════════════════════════════════════
+  let chartInstance = null;
+
+  function renderChart(allRows) {
+    const COLORS = [
+      "#CC0000","#2D2D2D","#E67E22","#2980B9","#27AE60",
+      "#8E44AD","#16A085","#D35400","#7F8C8D","#C0392B"
+    ];
+
+    // Count per sandwich for top-5
+    const totalCounts = {};
+    allRows.forEach(r => {
+      if (r.broodje) totalCounts[r.broodje] = (totalCounts[r.broodje] || 0) + 1;
+    });
+    const top5 = Object.entries(totalCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name]) => name);
+
+    if (top5.length === 0) return;
+
+    // Group by ISO week key "YYYY-WW"
+    function weekKey(ts) {
+      const d = ts?.toDate ? ts.toDate() : new Date(ts);
+      const tmp = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      tmp.setUTCDate(tmp.getUTCDate() + 4 - (tmp.getUTCDay() || 7));
+      const y = tmp.getUTCFullYear();
+      const wk = Math.ceil((((tmp - new Date(Date.UTC(y, 0, 1))) / 86400000) + 1) / 7);
+      return `${y}-W${String(wk).padStart(2, "0")}`;
+    }
+
+    const weekSet = new Set();
+    allRows.forEach(r => { if (r.timestamp) weekSet.add(weekKey(r.timestamp)); });
+    const weeks = [...weekSet].sort();
+
+    const datasets = top5.map((name, i) => {
+      const data = weeks.map(wk => {
+        return allRows.filter(r => r.broodje === name && r.timestamp && weekKey(r.timestamp) === wk).length;
+      });
+      return {
+        label: name,
+        data,
+        borderColor: COLORS[i],
+        backgroundColor: COLORS[i] + "22",
+        tension: 0.35,
+        fill: false,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        borderWidth: 2
+      };
+    });
+
+    document.getElementById("chart-section").style.display = "";
+
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(document.getElementById("chart-populair"), {
+      type: "line",
+      data: { labels: weeks, datasets },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { position: "bottom", labels: { font: { size: 12 }, boxWidth: 12 } }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { stepSize: 1, precision: 0 },
+            grid: { color: "#f0f0f0" }
+          },
+          x: { grid: { color: "#f0f0f0" } }
+        }
+      }
+    });
+  }
+
+  // ════════════════════════════════════════════
+  // POPULAR BADGE — loaded on init from all orders
+  // ════════════════════════════════════════════
+  async function loadPopularBadge() {
+    try {
+      const snap = await db.collection("bestellingen").get();
+      const counts = {};
+      snap.forEach(doc => {
+        const b = doc.data().broodje;
+        if (b) counts[b] = (counts[b] || 0) + 1;
+      });
+      const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+      if (!top) return;
+      document.querySelectorAll(".sandwich-card").forEach(card => {
+        if (card.dataset.name === top) {
+          card.innerHTML = `${top} <span class="popular-badge">★ Populairst</span>`;
+        }
+      });
+    } catch (e) { console.error(e); }
   }
 
   function escHtml(str) {
@@ -1179,6 +1328,7 @@
   buildCards(WARME_BROODJES, "warm", "grid-warm");
   buildBreadOptions();
   updatePrice();
+  loadPopularBadge();
 </script>
 </body>
 </html>
