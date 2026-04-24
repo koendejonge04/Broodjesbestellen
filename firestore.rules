@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Bestellingen: iedereen mag lezen en schrijven (geen login vereist)
+    match /bestellingen/{document} {
+      allow read, write: if true;
+    }
+
+    // Instellingen (bestellijst openen/sluiten): iedereen mag lezen en schrijven
+    match /instellingen/{document} {
+      allow read, write: if true;
+    }
+  }
+}
